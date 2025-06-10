@@ -26,22 +26,31 @@ def set_refresh_token(refresh_token):
     dotenv.load_dotenv(dotenv_file)
 
 
-# Loops the downloads folder for files and removes three days old files based on their filenames
-def delete_x_days_old_reports(path, days):
-    today = datetime.datetime.today().date()
+# Keep latest three reports and delete the rest
+def delete_x_days_old_reports(path):
+    files = []
     for filename in os.listdir(path):
         if "All%20Grades-" in filename and filename.endswith(".zip"):
-            logger.debug(f"Checking file: {filename}")
             try:
                 timestamp_str = filename.replace(".zip", "").split("T")[0].split("-")[-3:]
                 date_str = "-".join(timestamp_str)
                 file_date = datetime.datetime.strptime(date_str, "%m-%d-%Y").date()
-                if (today - file_date).days > days:
-                    file_path = os.path.join(path, filename)
-                    os.remove(file_path)
-                    logger.info(f"Deleted old report: {file_path}")
+                files.append((file_date, filename))
             except Exception as e:
                 logger.error(f"Skipping file {filename}: {e}")
+
+    # Sort by date descending (newest first)
+    files.sort(reverse=True)
+
+    # Keep the latest 3 files, delete the rest
+    for _, filename in files[3:]:
+        file_path = os.path.join(path, filename)
+        try:
+            os.remove(file_path)
+            logger.info(f"Deleted old report: {file_path}")
+        except Exception as e:
+            logger.error(f"Failed to delete {file_path}: {e}")
+
 
 # Main function
 def main():
@@ -152,7 +161,7 @@ def main():
 
 
     # Delete old 3 day old reports
-    delete_x_days_old_reports(base, 3)
+    delete_x_days_old_reports(base)
 
 # Main 
 if __name__ == "__main__":
